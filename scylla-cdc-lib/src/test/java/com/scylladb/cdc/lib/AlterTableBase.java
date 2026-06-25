@@ -33,6 +33,7 @@ public abstract class AlterTableBase {
 
   private static Session driverSession;
   private static Cluster cluster;
+  private static final Object SESSION_LOCK = new Object();
 
   public abstract String testKeyspace();
 
@@ -104,13 +105,16 @@ public abstract class AlterTableBase {
   }
 
   public Session getDriverSession() {
-    if (cluster == null || cluster.isClosed()) {
-      cluster = Cluster.builder().addContactPoint(hostname).withPort(port).build();
+    synchronized (SESSION_LOCK) {
+      if (cluster == null || cluster.isClosed()) {
+        cluster = Cluster.builder().addContactPoint(hostname).withPort(port).build();
+        driverSession = null; // Invalidate session when cluster is recreated
+      }
+      if (driverSession == null || driverSession.isClosed()) {
+        driverSession = cluster.connect();
+      }
+      return driverSession;
     }
-    if (driverSession == null || driverSession.isClosed()) {
-      driverSession = cluster.connect();
-    }
-    return driverSession;
   }
 
   protected void clearSharedVariables() {

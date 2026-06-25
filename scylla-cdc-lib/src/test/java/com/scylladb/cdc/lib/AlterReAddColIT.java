@@ -1,6 +1,5 @@
 package com.scylladb.cdc.lib;
 
-import com.datastax.driver.core.PreparedStatement;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.scylladb.cdc.model.worker.ChangeSchema;
 import com.scylladb.cdc.model.worker.RawChange;
@@ -77,24 +76,16 @@ public class AlterReAddColIT extends AlterTableBase {
   @Override
   public Runnable createDatagenTask() {
     return () -> {
-      PreparedStatement ps = getDriverSession().prepare(
-          String.format(
-              "INSERT INTO %s.%s (column1, column2, column3, column4) VALUES (?, ?, ?, ?);",
-              testKeyspace(), testTable()));
-      boolean reprepareOnce = true;
       while (!datagenShouldStop.get()) {
         int current = datagenCounter.incrementAndGet();
         if (!isAfterAlter.get()) {
-          getDriverSession().execute(ps.bind(1, 1, current, current));
+          getDriverSession().execute(String.format(
+              "INSERT INTO %s.%s (column1, column2, column3, column4) VALUES (%d, %d, %d, %d);",
+              testKeyspace(), testTable(), 1, 1, current, current));
         } else {
-          if (reprepareOnce) {
-            reprepareOnce = false;
-            ps = getDriverSession().prepare(
-                String.format(
-                    "INSERT INTO %s.%s (column1, column2, column3, column4) VALUES (?, ?, ?, ?) ;",
-                    testKeyspace(), testTable()));
-          }
-          getDriverSession().execute(ps.bind(1, 1, current, Integer.toString(current)));
+          getDriverSession().execute(String.format(
+              "INSERT INTO %s.%s (column1, column2, column3, column4) VALUES (%d, %d, %d, '%s');",
+              testKeyspace(), testTable(), 1, 1, current, Integer.toString(current)));
         }
         Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
       }
